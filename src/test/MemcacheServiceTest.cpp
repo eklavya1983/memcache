@@ -54,6 +54,7 @@ class ClientServiceFactory : public ServiceFactory<Pipeline, Req, Resp> {
 
 TEST(MemcacheService, basicops)
 {
+    /* Set up the server */
     auto server = std::make_unique<memcache::MemcacheService>(8080,
                                                               2,
                                                               2,
@@ -65,6 +66,7 @@ TEST(MemcacheService, basicops)
     });
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
+    /* Set up the client */
     auto client = std::make_shared<ClientBootstrap<CacheClientPipeline>>();
     ClientServiceFactory<CacheClientPipeline, MessagePtr, MessagePtr> serviceFactory;
     client->pipelineFactory(
@@ -87,12 +89,44 @@ TEST(MemcacheService, basicops)
     rep = (*service)(std::move(req));
     rep.then([&](MessagePtr val) {
          ASSERT_EQ(val->header.reserved, STATUS_OK); 
+         ASSERT_EQ(val->header.cas, 1ull); 
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
+
+    /* Set on the same key should generate new cas version*/
+    req = Message::makeMessage(SET_OP, true, "key1", "value1");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_OK); 
+         ASSERT_EQ(val->header.cas, 2ull); 
          EventBaseManager::get()->getEventBase()->terminateLoopSoon();
     });
     EventBaseManager::get()->getEventBase()->loopForever();
 
     /* Get of valid key should return STATUS_OK */ 
     req = Message::makeMessage(GET_OP, true, "key1");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_OK); 
+         ASSERT_EQ(val->value->moveToFbString().toStdString(), "value1");
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
+
+    /* Get of valid key with invalid cas should return KEY_NOT_FOUND*/ 
+    req = Message::makeMessage(GET_OP, true, "key1");
+    req->header.cas = 1ull;
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_KEY_NOT_FOUND); 
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
+
+    /* Get of valid key with valid cas should return STATUS_OK */ 
+    req = Message::makeMessage(GET_OP, true, "key1");
+    req->header.cas = 2ull;
     rep = (*service)(std::move(req));
     rep.then([&](MessagePtr val) {
          ASSERT_EQ(val->header.reserved, STATUS_OK); 

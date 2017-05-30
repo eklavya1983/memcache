@@ -15,7 +15,7 @@ struct Shard : KVCache {};
 * @brief Cache entry
 */
 struct CacheEntry {
-    int32_t                 version;
+    uint64_t                version;
     folly::IOBuf            value;
 };
 

@@ -20,8 +20,11 @@ folly::Future<MessagePtr> EmbeddedKvStoreShard::handleGet(MessagePtr req)
         auto itr = cache_.find(req->key);         
         if (itr == cache_.end()) {
             return Message::makeMessageWithStatus(req->header.opcode, STATUS_KEY_NOT_FOUND); 
+        } else if (req->header.cas && req->header.cas != itr->second.version) {
+            return Message::makeMessageWithStatus(req->header.opcode, STATUS_KEY_NOT_FOUND); 
+        } else {
+            return Message::makeMessage(req->header.opcode, false, req->key, itr->second.value);
         }
-        return Message::makeMessage(req->header.opcode, false, req->key, itr->second.value);
     });
 }
 
@@ -34,12 +37,17 @@ folly::Future<MessagePtr> EmbeddedKvStoreShard::handleSet(MessagePtr req)
         }
 
         auto itr = cache_.find(req->key);
+        uint64_t retVersion;
         if (itr != cache_.end()) {
             itr->second.version++;
+            retVersion = itr->second.version;
         } else {
-            cache_[req->key] = CacheEntry{0, *(req->value)};
+            cache_[req->key] = CacheEntry{1, *(req->value)};
+            retVersion = 1;
         }
-        return Message::makeMessageWithStatus(req->header.opcode, STATUS_OK); 
+        auto rep = Message::makeMessageWithStatus(req->header.opcode, STATUS_OK); 
+        rep->header.cas = retVersion;
+        return rep;
     });
 }
 
