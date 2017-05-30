@@ -29,8 +29,12 @@ folly::Future<MessagePtr> EmbeddedKvStoreShard::handleSet(MessagePtr req)
 {
     return
     via(eb_).then([this, req = std::move(req)]() mutable {
+        if (!req->value) {
+            return Message::makeMessageWithStatus(req->header.opcode, STATUS_INVALID_ARGS);
+        }
+
         auto itr = cache_.find(req->key);
-        if (itr == cache_.end()) {
+        if (itr != cache_.end()) {
             itr->second.version++;
         } else {
             cache_[req->key] = CacheEntry{0, *(req->value)};
@@ -48,7 +52,7 @@ folly::Future<MessagePtr> EmbeddedKvStoreShard::handleDelete(MessagePtr req)
             return Message::makeMessageWithStatus(req->header.opcode, STATUS_KEY_NOT_FOUND); 
         } else {
             cache_.erase(itr);
-            return Message::makeMessageWithStatus(req->header.opcode, STATUS_KEY_NOT_FOUND); 
+            return Message::makeMessageWithStatus(req->header.opcode, STATUS_OK); 
         }
     });
 }

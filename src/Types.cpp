@@ -77,6 +77,13 @@ MessagePtr Message::makeMessage(uint8_t opcode, bool isReq,
     return msg;
 }
 
+MessagePtr Message::makeMessage(uint8_t opcode, bool isReq,
+                                const std::string &key, const std::string &value)
+{
+    auto iobuf = folly::IOBuf::copyBuffer(value);
+    return makeMessage(opcode, isReq, key, *iobuf);
+}
+
 std::ostream& operator<< (std::ostream& os, const Message& msg)
 {
     switch (msg.header.magic) {

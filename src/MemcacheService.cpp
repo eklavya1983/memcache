@@ -31,6 +31,9 @@ struct ShardRouter :  HandlerAdapter<MessagePtr> {
     }
 
     inline folly::Future<MessagePtr> handle(MessagePtr req) {
+        if (req->key.size() == 0) {
+            return Message::makeMessageWithStatus(req->header.opcode, STATUS_INVALID_ARGS); 
+        }
         auto shard = service_->lookupShard(req->key);
         switch (req->header.opcode) {
             case GET_OP:
@@ -38,7 +41,7 @@ struct ShardRouter :  HandlerAdapter<MessagePtr> {
             case SET_OP:
                 return shard->handleSet(std::move(req));
             case DELETE_OP:
-                return shard->handleSet(std::move(req));
+                return shard->handleDelete(std::move(req));
             default:
                 return Message::makeMessageWithStatus(req->header.opcode, STATUS_UNKNOWN_COMMAND); 
         }

@@ -62,6 +62,8 @@ struct Message {
     static MessagePtr makeMessage(uint8_t opcode, bool isReq, const std::string &key);
     static MessagePtr makeMessage(uint8_t opcode, bool isReq,
                                   const std::string &key, const folly::IOBuf &value);
+    static MessagePtr makeMessage(uint8_t opcode, bool isReq,
+                                  const std::string &key, const std::string &value);
 };
 
 std::ostream& operator<< (std::ostream&, const Message&);

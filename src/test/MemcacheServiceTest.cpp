@@ -16,39 +16,6 @@ using namespace wangle;
 using namespace memcache;
 
 typedef Pipeline<folly::IOBufQueue&, MessagePtr> CacheClientPipeline;
-// typedef Pipeline<folly::IOBufQueue&, std::string> CacheClientPipeline;
-
-// the handler for receiving messages back from the server
-class CacheClientHandler : public HandlerAdapter<MessagePtr> {
- public:
-  virtual void read(Context*, MessagePtr msg) override {
-      LOG(INFO) << "received back: " << *msg;
-  }
-  virtual void readException(Context* ctx, exception_wrapper e) override {
-    std::cout << exceptionStr(e) << std::endl;
-    close(ctx);
-  }
-  virtual void readEOF(Context* ctx) override {
-    std::cout << "EOF received :(" << std::endl;
-    close(ctx);
-  }
-};
-
-// the handler for receiving messages back from the server
-class EchoHandler : public HandlerAdapter<std::string> {
- public:
-  virtual void read(Context*, std::string msg) override {
-    std::cout << "received back: " << msg;
-  }
-  virtual void readException(Context* ctx, exception_wrapper e) override {
-    std::cout << exceptionStr(e) << std::endl;
-    close(ctx);
-  }
-  virtual void readEOF(Context* ctx) override {
-    std::cout << "EOF received :(" << std::endl;
-    close(ctx);
-  }
-};
 
 // chains the handlers together to define the response pipeline
 class CacheClientPipelineFactory : public PipelineFactory<CacheClientPipeline> {
@@ -56,15 +23,8 @@ class CacheClientPipelineFactory : public PipelineFactory<CacheClientPipeline> {
   CacheClientPipeline::Ptr newPipeline(std::shared_ptr<AsyncTransportWrapper> sock) {
     auto pipeline = CacheClientPipeline::create();
     pipeline->addBack(AsyncSocketHandler(sock));
-    // pipeline->addBack(EventBaseHandler());
-    /*
-    pipeline->addBack(LineBasedFrameDecoder(8192, false));
-    pipeline->addBack(StringCodec());
-    pipeline->addBack(EchoHandler());
-   */ 
     pipeline->addBack(LengthFieldBasedFrameDecoder(4, UINT_MAX, 8, 12, 0, false));
     pipeline->addBack(MessageSerializationHandler());
-    pipeline->addBack(CacheClientHandler());
     pipeline->finalize();
     return pipeline;
   }
@@ -112,56 +72,67 @@ TEST(MemcacheService, basicops)
     SocketAddress addr("127.0.0.1", 8080);
     client->connect(addr);
     auto service = serviceFactory(client).value();
-    auto msg = Message::makeMessage(GET_OP, true, "key1");
-    auto rep = (*service)(std::move(msg));
 
+    /* Get of non-existent key should return STATUS_KEY_NOT_FOUND */ 
+    auto req = Message::makeMessage(GET_OP, true, "key1");
+    auto rep = (*service)(std::move(req));
     rep.then([&](MessagePtr val) {
-         std::cout << *val;
+         ASSERT_EQ(val->header.reserved, STATUS_KEY_NOT_FOUND); 
          EventBaseManager::get()->getEventBase()->terminateLoopSoon();
     });
     EventBaseManager::get()->getEventBase()->loopForever();
 
-    while (true) {
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
-
-    server.reset();
-    t.join();
-}
-
-#if 0
-TEST(MemcacheService, basicops)
-{
-    auto server = std::make_unique<memcache::MemcacheService>(8080,
-                                                              2,
-                                                              2,
-                                                              4096,
-                                                              2);
-    server->init();
-    std::thread t([&server]() {
-          server->run();
+    /* Set should succeed */
+    req = Message::makeMessage(SET_OP, true, "key1", "value1");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_OK); 
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
     });
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EventBaseManager::get()->getEventBase()->loopForever();
 
-    ClientBootstrap<CacheClientPipeline> client;
-    client.group(std::make_shared<wangle::IOThreadPoolExecutor>(1));
-    client.pipelineFactory(std::make_shared<CacheClientPipelineFactory>());
-    auto clientpipeline = client.connect(SocketAddress("::1", 8080)).get();
-    auto msg = Message::makeMessage(GET_OP, true, "key1");
-    clientpipeline->write(std::move(msg)).get();
-    // clientpipeline->write("hello\r\n").get();
+    /* Get of valid key should return STATUS_OK */ 
+    req = Message::makeMessage(GET_OP, true, "key1");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_OK); 
+         ASSERT_EQ(val->value->moveToFbString().toStdString(), "value1");
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
 
-    while (true) {
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
+    /* Delete of non-existent key should return STATUS_KEY_NOT_FOUND */
+    req = Message::makeMessage(DELETE_OP, true, "invalidkey");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_KEY_NOT_FOUND); 
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
+
+    /* Delete of valid key should return STATUS_OK */
+    req = Message::makeMessage(DELETE_OP, true, "key1");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_OK); 
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
+
+    /* Ensure delete actually deleted */
+    req = Message::makeMessage(DELETE_OP, true, "key1");
+    rep = (*service)(std::move(req));
+    rep.then([&](MessagePtr val) {
+         ASSERT_EQ(val->header.reserved, STATUS_KEY_NOT_FOUND); 
+         EventBaseManager::get()->getEventBase()->terminateLoopSoon();
+    });
+    EventBaseManager::get()->getEventBase()->loopForever();
 
     server.reset();
     t.join();
 }
-#endif
 
-#if 0
-TEST(Service, write)
+TEST(Types, DISABLED_serializeToFile)
 {
     auto msg = Message::makeMessage(GET_OP, true, "key1");
     auto iobuf = msg->serialize();
@@ -169,7 +140,6 @@ TEST(Service, write)
     myFile.write(reinterpret_cast<const char*>(iobuf->data()), iobuf->length());
     myFile.close();
 }
-#endif
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
