@@ -1,0 +1,18 @@
+Approach
+* In this implmentation explicit locking was avoided.
+* All threads are non-blocking including the threads used wangle(open source library from facebook) tcp server.
+* Cache is divided into shards.  Each shard is responsible for serving a range of non-overlapping key space.
+* Each shard assigned a shard thread.  All operations on the shard are executed on this thread.  This enables the code to be lock free.  In most cases you will even get better system cache hit rate as context switching is avoided.  It's possible for one shard thread to manage more than one shard.  Shard assignment to thread is round robin based.
+* Number of shards can be scaled with number of cores.
+* Each shard is essentially an independent cache.  Cache size limit is enforced at shard level.
+* Cache eviction is based on lru policy.  To do so a linked list of keys is maintained.  The order of keys is the order in which keys are accessed in the shard.  Storing the keys in the linked list is a bit inefficient, esp if the average key size is large.  This can be optimized by storing the address of the key (which requires the address of they key in <key,value> pair in map to not change)
+
+Improvements
+1. At the moment the protocol is request, response based.  Since each request doesn't have a request id, responses to requests can't be out of order.  To support out of order response, request id needs to be part of the protocol.
+2. At the moment there is no limit the number of outstanding clients.  This can be implemented by having a limit on the number of open sockets against the server.
+3. An api needs to be provided to implement monitoring of the service.  In the current implementation one way to do this would be to introduce a new operation type called STATUS_OP. The response could be json, describing the number of gets, deletes, and sets.  This allows us one to monitor request processing rates.
+
+Testing
+* Basic get, set, delete operations are tested.
+* Basic test for lru scheme is also provided.
+* With time I would have tests multi-threaded/multi-client get, set, delete operations.
