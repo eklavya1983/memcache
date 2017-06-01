@@ -16,7 +16,7 @@ typedef Pipeline<IOBufQueue&, MessagePtr> MemcachePipeline;
  */
 struct MemcacheService {
     MemcacheService(int port,
-                    int serverIOThreadsCount,
+                    int shardThreadsCount,
                     int shardCount,
                     int64_t maxCacheEntriesCount,
                     int maxClients);

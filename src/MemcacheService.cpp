@@ -75,14 +75,14 @@ struct MemcachePipelineFactory : PipelineFactory<MemcachePipeline> {
 };
 
 MemcacheService::MemcacheService(int port,
-                                 int serverIOThreadsCount,
+                                 int shardThreadsCount,
                                  int shardCount,
                                  int64_t maxCacheEntriesCount,
                                  int maxClients)
     : port_(port),
     shards_(shardCount)
 {
-    threadpool_ = std::make_shared<wangle::IOThreadPoolExecutor>(serverIOThreadsCount);
+    threadpool_ = std::make_shared<wangle::IOThreadPoolExecutor>(shardThreadsCount);
     for (auto & shard : shards_) {
         shard.reset(new EmbeddedKvStoreShard(threadpool_->getEventBase(),
                                              maxCacheEntriesCount));
