@@ -13,3 +13,4 @@ include_directories(${GTEST_INCLUDE_DIRS})
 link_directories(${GTEST_LIB_DIRS} ${ARTIFACTS_LIB_DIRS})
 
 add_unit_test(MemcacheService)
+add_unit_test(Shard)
