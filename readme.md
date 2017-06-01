@@ -30,11 +30,11 @@ docker start -ia memcachedev
 ```
 
 #### Parameters that can be configured
-*cachesz (Max number of cache entries) type: int32 default: 65536
-*maxclients (Max number of clients) type: int32 default: 16
-*port (server port) type: int32 default: 8080
-*shards (Number of shards) type: int32 default: 4
-*shardthreads (Server socket IO threads) type: int32 default: 2
+* cachesz (Max number of cache entries) type: int32 default: 65536
+* maxclients (Max number of clients) type: int32 default: 16
+* port (server port) type: int32 default: 8080
+* shards (Number of shards) type: int32 default: 4
+* shardthreads (Server socket IO threads) type: int32 default: 2
 
 To run memcache-main with at port 8000 with 8 shards
 ```
@@ -43,9 +43,9 @@ To run memcache-main with at port 8000 with 8 shards
 NOTE: At the moment support for maxclients does not exist.
 
 #### Third party dependencies
-*wangle
-*folly
-*gtest
-*gflags
-*glog
+* wangle
+* folly
+* gtest
+* gflags
+* glog
 All the dependent libraries are checked into source tree under artifacts folder.
