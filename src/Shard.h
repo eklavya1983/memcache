@@ -15,8 +15,9 @@ struct Shard : KVCache {};
 * @brief Cache entry
 */
 struct CacheEntry {
-    uint64_t                version;
-    folly::IOBuf            value;
+    uint64_t                    version;
+    std::list<Key>::iterator    lruPos;
+    folly::IOBuf                value;
 };
 
 /**
@@ -26,16 +27,23 @@ struct CacheEntry {
  */
 struct EmbeddedKvStoreShard : Shard {
     EmbeddedKvStoreShard(folly::EventBase *eb,
-                         int64_t maxCacheEntries);
+                         uint64_t maxCacheEntries);
     void init() override;
     folly::Future<MessagePtr> handleGet(MessagePtr req) override;
     folly::Future<MessagePtr> handleSet(MessagePtr req) override;
     folly::Future<MessagePtr> handleDelete(MessagePtr req) override;
 
  private:
+    /* Eventbase on which all shard operations are performed */
     folly::EventBase                            *eb_;
-    const int64_t                               maxCacheEntries_;
+    /* Maximum cache size */
+    const uint64_t                              maxCacheEntries_;
+    /* In-memory cache */
     std::unordered_map<Key, CacheEntry>         cache_;
+    /* lru list.  front() points to most recently used item and back() points
+     * to least recently used item
+     */
+    std::list<Key>                              lruList_;
 };
 
 }  // namespace memcache
