@@ -1,5 +1,5 @@
 #### Building and running
-In order to build you will need docker.  From the Dockerfile provided with the source the requiredimage can be created.  This resulting image can be used for building as well as running.  Use the following steps to build and run
+In order to build you will need docker.  From the Dockerfile provided with the source the required image can be created.  This resulting image can be used for building as well as running.  Use the following steps to build and run
 1. Clone from git
 2. Build docker image from the provided Dockerfile in the source tree (Provided at top of the tree)
 ```
@@ -9,7 +9,7 @@ docker build -t memcache:dev .
 ```
 docker run -it -v <srcdir>:/home/memcache --name memcachedev memcache:dev /bin/bash
 ```
-4.  Build the source 
+4.  Build the source in the docker container
 ```
 cd /home/memcache
 mkdir build
@@ -43,9 +43,9 @@ To run memcache-main with at port 8000 with 8 shards
 NOTE: At the moment support for maxclients does not exist.
 
 #### Third party dependencies
-* wangle
-* folly
-* gtest
-* gflags
-* glog
+* [wangle](https://github.com/facebook/wangle)
+* [folly](https://github.com/facebook/folly)
+* [gtest](https://github.com/google/googletest)
+* [glog](https://github.com/google/glog)
+
 All the dependent libraries are checked into source tree under artifacts folder.
